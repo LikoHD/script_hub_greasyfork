@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ScriptHub - Available Scripts Finder
-// @name:zh      ScriptHub - 显示当前网站可用脚本
+// @name:zh      ScriptHub - 🧲 高效查找当前网站可用油猴脚本 🔍
 // @namespace    http://tampermonkey.net/
 // @version      1.1
 // @description  Shows available userscripts for the current website from Greasy Fork
@@ -21,7 +21,6 @@
 (function() {
     'use strict';
 
-    // Add styles
     GM_addStyle(`
         .script-hub-button {
             position: fixed;
@@ -218,20 +217,15 @@
         }
     `);
 
-    // 提取顶级域名
     function extractTLD(domain) {
-        // 移除协议和路径，只保留域名部分
         domain = domain.replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
-        // 获取最后两部分作为域名
         const parts = domain.split('.');
         if (parts.length >= 2) {
-            // 如果是二级域名，返回完整域名
             return parts.slice(-2).join('.').toLowerCase();
         }
         return domain.toLowerCase();
     }
 
-    // Format date
     function formatDate(dateString) {
         const date = new Date(dateString);
         const now = new Date();
@@ -245,7 +239,6 @@
         }
     }
 
-    // 创建UI元素
     function createUI() {
         const button = document.createElement('div');
         button.className = 'script-hub-button';
@@ -258,9 +251,7 @@
         close.textContent = '×';
         close.onclick = (e) => {
             e.stopPropagation();
-            // 获取当前网站的域名
             const currentDomain = window.location.hostname;
-            // 调用油猴API将当前网站添加到排除列表
             if (typeof GM_getValue !== 'undefined' && typeof GM_setValue !== 'undefined') {
                 const excludedDomains = GM_getValue('excludedDomains', []);
                 if (!excludedDomains.includes(currentDomain)) {
@@ -274,7 +265,6 @@
         button.appendChild(text);
         button.appendChild(close);
         
-        // 修复拖动功能
         let isDragging = false;
         let startX = 0;
         let startY = 0;
@@ -282,7 +272,7 @@
         let startTop = 0;
 
         function handleMouseDown(e) {
-            if (e.target === close) return; // 如果点击的是关闭按钮，不启动拖动
+            if (e.target === close) return;
             
             isDragging = true;
             startX = e.clientX;
@@ -292,7 +282,7 @@
             startLeft = rect.left;
             startTop = rect.top;
             
-            button.style.transition = 'none'; // 拖动时禁用过渡效果
+            button.style.transition = 'none';
             button.style.cursor = 'grabbing';
         }
 
@@ -305,7 +295,6 @@
             const newLeft = startLeft + deltaX;
             const newTop = startTop + deltaY;
             
-            // 确保按钮不会被拖出视口
             const buttonWidth = button.offsetWidth;
             const buttonHeight = button.offsetHeight;
             const viewportWidth = window.innerWidth;
@@ -324,7 +313,7 @@
             if (!isDragging) return;
             
             isDragging = false;
-            button.style.transition = ''; // 恢复过渡效果
+            button.style.transition = '';
             button.style.cursor = 'move';
         }
 
@@ -338,16 +327,13 @@
         sidebar.className = 'script-hub-sidebar';
         document.body.appendChild(sidebar);
 
-        // 点击页面其他地方关闭侧边栏
         document.addEventListener('click', (e) => {
-            // 检查点击是否在侧边栏或按钮之外
             if (!sidebar.contains(e.target) && !button.contains(e.target) && sidebar.classList.contains('show')) {
                 sidebar.classList.remove('show');
                 button.classList.remove('active');
             }
         });
 
-        // 防止点击侧边栏内部时关闭
         sidebar.addEventListener('click', (e) => {
             e.stopPropagation();
         });
@@ -356,7 +342,7 @@
             if (e.target === close) return;
             sidebar.classList.toggle('show');
             button.classList.toggle('active');
-            e.stopPropagation(); // 防止触发document的点击事件
+            e.stopPropagation();
         });
 
         sidebar.innerHTML = `
@@ -364,7 +350,7 @@
                 <div>
                     <div class="sidebar-header-tools">
                         <a href="https://chromewebstore.google.com/detail/jdopbpkjbknppilnpjmceinnpkaigaem" target="_blank">
-                           🧲 ScriptHub插件
+                           ScriptHub插件
                         </a>
                         <a href="https://likofree.pages.dev/projects/" target="_blank">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -386,16 +372,13 @@
         `;
         document.body.appendChild(sidebar);
 
-        // 事件监听
         button.addEventListener('click', async () => {
             sidebar.classList.add('active');
             const scriptList = sidebar.querySelector('.script-list');
             
-            // 如果列表为空，加载脚本数据
             if (!scriptList.children.length) {
                 const rawDomain = document.location.hostname;
                 const domain = extractTLD(rawDomain);
-                console.log('🔍 Domain processing:', { raw: rawDomain, processed: domain });
                 await loadScriptDetails(domain, scriptList);
             }
         });
@@ -407,93 +390,71 @@
         return { button, sidebar };
     }
 
-    // 加载脚本详细信息
     async function loadScriptDetails(domain, container, retryCount = 0) {
-        console.log('📑 loadScriptDetails - Loading details for:', domain);
         container.innerHTML = '<div class="loading">Loading scripts...</div>';
 
         try {
-            const siteData = JSON.parse(GM_getResourceText('SITE_DATA'));
-            const scriptCount = siteData[domain] || 0;
+            const encodedDomain = encodeURIComponent(domain);
+            const apiUrl = `https://greasyfork.org/scripts/by-site/${domain}?filter_locale=0&page=1`;
+            const response = await fetch(apiUrl);
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+            const scripts = doc.querySelector("#browse-script-list")?.querySelectorAll('[data-script-id]');
+            let scriptsInfo = [];
+            
+            if (!scripts) {
+                scriptsInfo = errorMessage;
+            } else {
+                scripts.forEach(script => {
+                    scriptsInfo.push({
+                        id: script.getAttribute('data-script-id'),
+                        name: script.getAttribute('data-script-name'),
+                        author: script.querySelector("dd.script-list-author")?.textContent || '',
+                        description: script.querySelector(".script-description")?.textContent || '',
+                        version: script.getAttribute('data-script-version'),
+                        url: 'https://greasyfork.org/scripts/' + script.getAttribute('data-script-id'),
+                        createDate: script.getAttribute('data-script-created-date'),
+                        updateDate: script.getAttribute('data-script-updated-date'),
+                        installs: script.getAttribute('data-script-total-installs'),
+                        dailyInstalls: script.getAttribute('data-script-daily-installs'),
+                        ratingScore: script.getAttribute('data-script-rating-score')
+                    });
+                });
+            }
 
-            if (scriptCount === 0) {
-                container.innerHTML = '<div class="no-scripts">No scripts available for this site</div>';
+            container.innerHTML = '';
+            
+            if (!scriptsInfo.length) {
+                container.innerHTML = '<div class="no-scripts">No scripts found</div>';
                 return;
             }
 
-            // 获取详细信息
-            const encodedDomain = encodeURIComponent(domain);
-            const apiUrl = `https://greasyfork.org/scripts/by-site/${encodedDomain}.json`;
-            console.log('📑 loadScriptDetails - Fetching from:', apiUrl);
-
-            return new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
-                    method: 'GET',
-                    url: apiUrl,
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'ScriptHub/1.1',
-                        'Origin': 'https://greasyfork.org',
-                        'Referer': 'https://greasyfork.org/'
-                    },
-                    anonymous: true,
-                    nocache: true,
-                    timeout: 10000,
-                    onload: function(response) {
-                        try {
-                            if (response.status === 200) {
-                                const scripts = JSON.parse(response.responseText);
-                                console.log(`📑 loadScriptDetails - Loaded ${scripts.length} scripts`);
-                                
-                                container.innerHTML = '';
-                                
-                                if (!scripts.length) {
-                                    container.innerHTML = '<div class="no-scripts">No scripts found</div>';
-                                    return;
-                                }
-
-                                scripts.forEach(script => {
-                                    const scriptElement = document.createElement('div');
-                                    scriptElement.className = 'script-item';
-                                    
-                                    scriptElement.innerHTML = `
-                                        <h3><a href="${script.url}" target="_blank">${script.name}</a></h3>
-                                        <div class="script-description">${script.description}</div>
-                                        <div class="script-meta">
-                                            <span title="总安装量">📥 ${script.total_installs || 0}</span>
-                                            <span title="日安装量">📈 ${script.daily_installs || 0}</span>
-                                            <span title="更新时间">🕐 ${formatDate(script.code_updated_at)}</span>
-                                            <span class="author" title="${script.users[0]?.name || 'Unknown'}">
-                                                <a href="${script.users[0]?.url || '#'}" target="_blank">
-                                                    👨‍💻 ${script.users[0]?.name || 'Unknown'}
-                                                </a>
-                                            </span>
-                                        </div>
-                                    `;
-                                    container.appendChild(scriptElement);
-                                });
-                                resolve();
-                            } else {
-                                throw new Error(`HTTP ${response.status}`);
-                            }
-                        } catch (error) {
-                            reject(error);
-                        }
-                    },
-                    onerror: function(error) {
-                        reject(error);
-                    }
-                });
+            scriptsInfo.forEach(script => {
+                const scriptElement = document.createElement('div');
+                scriptElement.className = 'script-item';
+                
+                scriptElement.innerHTML = `
+                    <h3><a href="${script.url}" target="_blank">${script.name}</a></h3>
+                    <div class="script-description">${script.description}</div>
+                    <div class="script-meta">
+                        <span title="总安装量">📥 ${script.installs || 0}</span>
+                        <span title="日安装量">📈 ${script.dailyInstalls || 0}</span>
+                        <span title="更新时间">🕐 ${formatDate(script.updateDate)}</span>
+                        <span class="author" title="${script.author || 'Unknown'}">
+                            <a href="${script.url}" target="_blank">
+                                👨‍💻 ${script.author || 'Unknown'}
+                            </a>
+                        </span>
+                    </div>
+                `;
+                container.appendChild(scriptElement);
             });
         } catch (error) {
-            console.error('❌ loadScriptDetails - Error:', error);
-            
-            // 如果是网络错误且重试次数小于3次，则重试
             if (retryCount < 3) {
-                console.log(`📑 loadScriptDetails - Retrying (${retryCount + 1}/3)...`);
                 setTimeout(() => {
                     loadScriptDetails(domain, container, retryCount + 1);
-                }, 1000 * (retryCount + 1)); // 递增重试延迟
+                }, 1000 * (retryCount + 1));
             } else {
                 container.innerHTML = `
                     <div class="error">
@@ -505,23 +466,15 @@
         }
     }
 
-    // Initialize
     async function init() {
-        console.log('🚀 init - Starting initialization...');
         const { button, sidebar } = createUI();
-        console.log('🚀 init - UI created');
 
         const rawDomain = document.location.hostname;
-        console.log('🚀 init - Raw hostname:', rawDomain);
-        
         const domain = extractTLD(rawDomain);
-        console.log('🚀 init - Processed domain:', domain);
         
         try {
-            // 只获取脚本数量
             const siteData = JSON.parse(GM_getResourceText('SITE_DATA'));
             const count = siteData[domain] || 0;
-            console.log(`🚀 init - Found ${count} scripts for domain:`, domain);
 
             if (count === 0) {
                 button.style.display = 'none';
@@ -531,7 +484,6 @@
             const text = button.querySelector('span:nth-child(1)');
             text.textContent = count.toString();
         } catch (error) {
-            console.error('❌ init - Error:', error);
             button.style.display = 'none';
         }
     }
